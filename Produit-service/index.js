@@ -1,34 +1,22 @@
+require('dotenv').config(); // charge .env
+
 const express = require('express');
 const { MongoClient, ObjectId } = require('mongodb');
-const jwt = require('jsonwebtoken');
+const authMiddleware = require('../User-service/middleware/auth'); // middleware importé
+
 const app = express();
 app.use(express.json());
 
 const uri = 'mongodb://localhost:27017';
 const client = new MongoClient(uri);
 const dbName = 'userServiceDB';
-const secret = 'secretKey';
 
 client.connect();
 const db = client.db(dbName);
 const produits = db.collection('produits');
 
-function authenticate(req, res, next) {
-  const auth = req.headers.authorization;
-  if (!auth) return res.sendStatus(403);
-  const token = auth.split(' ')[1];
-  jwt.verify(token, secret, (err) => {
-    if (err) return res.sendStatus(403);
-    next();
-  });
-}
+app.use(authMiddleware); // applique le middleware JWT
 
-app.use(authenticate);
-
-app.get('/produit/:id', async (req, res) => {
-  const prod = await produits.findOne({ _id: new ObjectId(req.params.id) });
-  prod ? res.json(prod) : res.sendStatus(404);
-});
 
 app.post('/ajouter', async (req, res) => {
   await produits.insertOne({ ...req.body, created_at: new Date() });
@@ -54,6 +42,11 @@ app.get('/produit/recherche', async (req, res) => {
     ]
   }).toArray();
   res.json(result);
+});
+
+app.get('/produit/:id', async (req, res) => {
+  const prod = await produits.findOne({ _id: new ObjectId(req.params.id) });
+  prod ? res.json(prod) : res.sendStatus(404);
 });
 
 app.put('/produit/stock/:id', async (req, res) => {
